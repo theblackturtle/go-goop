@@ -44,7 +44,7 @@ func main() {
 						break
 					}
 					for _, url := range urls {
-						fmt.Fprintln(os.Stderr, url)
+						fmt.Println(url)
 					}
 					time.Sleep(time.Duration(delay) * time.Second)
 				}
