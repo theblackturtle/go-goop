@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -38,13 +39,13 @@ func main() {
 			defer wg.Done()
 			for dork := range jobs {
 				for page := 0; page <= numPage; page++ {
-					urls := search(c, dork, FBCookie, page, getFull)
+					results := search(c, dork, FBCookie, page, getFull)
 
-					if len(urls) == 0 {
+					if len(results) == 0 {
 						break
 					}
-					for _, url := range urls {
-						fmt.Println(url)
+					for _, result := range results {
+						fmt.Printf("%s - %s\n", result.Url, result.Title)
 					}
 					time.Sleep(time.Duration(delay) * time.Second)
 				}
@@ -53,7 +54,11 @@ func main() {
 	}
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
-		jobs <- sc.Text()
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		jobs <- line
 	}
 	close(jobs)
 	wg.Wait()

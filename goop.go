@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,15 +13,13 @@ import (
 	"time"
 )
 
+type Result struct {
+	Url   string
+	Title string
+}
 func getClient() *http.Client {
 	tr := &http.Transport{
-		MaxIdleConns:    30,
-		IdleConnTimeout: time.Second,
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		DialContext: (&net.Dialer{
-			Timeout:   time.Second * 20,
-			KeepAlive: time.Second,
-		}).DialContext,
 	}
 
 	re := func(req *http.Request, via []*http.Request) error {
@@ -32,12 +29,12 @@ func getClient() *http.Client {
 	return &http.Client{
 		Transport:     tr,
 		CheckRedirect: re,
-		Timeout:       time.Second * 10,
+		Timeout:       time.Second * 20,
 	}
 }
 
-func search(c *http.Client, query string, cookie string, page int, full bool) []string {
-	urls := []string{}
+func search(c *http.Client, query string, cookie string, page int, full bool) []Result {
+	var searchResults []Result
 
 	filter := 0
 	if full != true {
@@ -49,7 +46,7 @@ func search(c *http.Client, query string, cookie string, page int, full bool) []
 	u1, err := url.Parse("https://google.com")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Url parse error")
-		return urls
+		return searchResults
 	}
 	u1.Path += "/search"
 	p1 := url.Values{}
@@ -63,7 +60,7 @@ func search(c *http.Client, query string, cookie string, page int, full bool) []
 	u2, err := url.Parse("https://developers.facebook.com")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Url parse error")
-		return urls
+		return searchResults
 	}
 	u2.Path += "/tools/debug/echo/"
 	p2 := url.Values{}
@@ -74,7 +71,7 @@ func search(c *http.Client, query string, cookie string, page int, full bool) []
 	req, err := http.NewRequest("GET", u2.String(), nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return urls
+		return searchResults
 	}
 	req.Header.Set("Host", "developers.facebook.com")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0")
@@ -88,22 +85,27 @@ func search(c *http.Client, query string, cookie string, page int, full bool) []
 	resp, err := c.Do(req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error requesting %s: %s\n", u2, err)
-		return urls
+		return searchResults
 	}
 	raw, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error when read response query: %s\n", err.Error())
-		return urls
+		return searchResults
 	}
 
 	// Response double encoded
 	decodedRaw := html.UnescapeString(html.UnescapeString(string(raw)))
 
 	// Use regex to get urls
-	r := regexp.MustCompile(`<div class="[^"]+"><a href="\/url\?q=(.+?)&sa=[^"]+">`)
+	r := regexp.MustCompile(`<a href="/url\?q=(.+?)&sa=.*"><div class="[^"]+">(.*?)</div>`)
 	matches := r.FindAllStringSubmatch(decodedRaw, -1)
+
 	for _, v := range matches {
-		urls = append(urls, v[1])
+		r := Result{
+			Url:   v[1],
+			Title: v[2],
+		}
+		searchResults = append(searchResults, r)
 	}
-	return urls
+	return searchResults
 }
