@@ -45,7 +45,7 @@ func main() {
 						break
 					}
 					for _, result := range results {
-						fmt.Printf("%s - %s\n", result.Url, result.Title)
+						fmt.Printf("[%s] %s - %s\n", dork, result.Url, result.Title)
 					}
 					time.Sleep(time.Duration(delay) * time.Second)
 				}
